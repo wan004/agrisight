@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriSight 2.0 - Smart Crop Monitoring</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+        }
+        .upload-area {
+            border: 2px dashed #cbd5e0;
+            transition: all 0.3s ease;
+        }
+        .upload-area.dragover {
+            border-color: #667eea;
+            background-color: #f7fafc;
+        }
+        .confidence-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-leaf text-2xl"></i>
+                    <h1 class="text-2xl font-bold">AgriSight 2.0</h1>
+                </div>
+                <div class="flex space-x-6">
+                    <a href="/" class="flex items-center space-x-2 hover:text-gray-200 transition">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="/logs" class="flex items-center space-x-2 hover:text-gray-200 transition">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Analytics</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Status Bar -->
+        <div class="mb-8">
+            <div class="bg-white rounded-lg shadow-md p-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div id="esp32-status" class="flex items-center space-x-2">
+                            <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                            <span class="text-sm text-gray-600">ESP32 Disconnected</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-wifi text-green-500"></i>
+                            <span class="text-sm text-gray-600">Server Online</span>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        Last Update: <span id="last-update">--:--:--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sensor Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Soil Moisture -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-tint text-blue-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">Soil Moisture</h3>
+                            <p class="text-sm text-gray-500">Current reading</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-end space-x-2">
+                    <span id="moisture-value" class="text-3xl font-bold text-blue-600">--</span>
+                    <span class="text-lg text-gray-500">%</span>
+                </div>
+                <div class="mt-4">
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="moisture-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Temperature -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-thermometer-half text-red-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">Temperature</h3>
+                            <p class="text-sm text-gray-500">Ambient temperature</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-end space-x-2">
+                    <span id="temperature-value" class="text-3xl font-bold text-red-600">--</span>
+                    <span class="text-lg text-gray-500">°C</span>
+                </div>
+                <div class="mt-4 text-sm text-gray-600">
+                    <span id="temp-status">Loading...</span>
+                </div>
+            </div>
+
+            <!-- Humidity -->
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-cloud text-green-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">Humidity</h3>
+                            <p class="text-sm text-gray-500">Relative humidity</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-end space-x-2">
+                    <span id="humidity-value" class="text-3xl font-bold text-green-600">--</span>
+                    <span class="text-lg text-gray-500">%</span>
+                </div>
+                <div class="mt-4 text-sm text-gray-600">
+                    <span id="humidity-status">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Column -->
+            <div class="lg:col-span-2 space-y-8">
+                
+                <!-- Image Upload & Analysis -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-camera mr-3 text-purple-600"></i>
+                        Crop Disease Detection
+                    </h2>
+                    
+                    <!-- Upload Area -->
+                    <div id="upload-area" class="upload-area rounded-lg p-8 text-center mb-6">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+                        <h3 class="text-lg font-medium text-gray-700 mb-2">Upload Plant Image</h3>
+                        <p class="text-gray-500 mb-4">Drag and drop or click to select</p>
+                        <input type="file" id="file-input" accept="image/*" class="hidden">
+                        <button id="upload-btn" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition">
+                            Choose File
+                        </button>
+                    </div>
+                    
+                    <!-- Crop Type Selection -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Crop Type</label>
+                        <select id="crop-type" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="general">General</option>
+                            <option value="tomato">Tomato</option>
+                            <option value="potato">Potato</option>
+                            <option value="corn">Corn</option>
+                            <option value="wheat">Wheat</option>
+                            <option value="rice">Rice</option>
+                            <option value="apple">Apple</option>
+                            <option value="grape">Grape</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Analysis Results -->
+                    <div id="analysis-results" class="hidden">
+                        <div class="border-t pt-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <img id="analysis-image" class="w-full rounded-lg shadow-md" alt="Analyzed plant">
+                                </div>
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Analysis Results</h3>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="text-sm font-medium text-gray-600">Disease</label>
+                                            <p id="disease-name" class="text-lg font-semibold text-gray-800">-</p>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-medium text-gray-600">Confidence</label>
+                                            <div class="flex items-center space-x-3">
+                                                <div class="flex-1">
+                                                    <div class="w-full bg-gray-200 rounded-full h-2">
+                                                        <div id="confidence-bar" class="confidence-bar h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                                                    </div>
+                                                </div>
+                                                <span id="confidence-value" class="text-sm font-medium text-gray-700">0%</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-medium text-gray-600">Description</label>
+                                            <p id="disease-description" class="text-sm text-gray-700">-</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sensor Data Chart -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-chart-line mr-3 text-blue-600"></i>
+                        Sensor Trends
+                    </h2>
+                    <div class="h-80">
+                        <canvas id="sensor-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="space-y-8">
+                
+                <!-- Weather Widget -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-cloud-sun mr-3 text-yellow-600"></i>
+                        Weather
+                    </h2>
+                    
+                    <!-- Location Input -->
+                    <div class="mb-4">
+                        <div class="flex space-x-2">
+                            <input type="text" id="city-input" placeholder="Enter city name" 
+                                   class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <button id="get-weather-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                        <button id="use-location-btn" class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-map-marker-alt mr-1"></i>Use current location
+                        </button>
+                    </div>
+                    
+                    <!-- Weather Display -->
+                    <div id="weather-display" class="hidden">
+                        <div class="text-center mb-4">
+                            <div class="text-3xl font-bold text-gray-800" id="weather-temp">--°</div>
+                            <div class="text-gray-600" id="weather-desc">--</div>
+                            <div class="text-sm text-gray-500" id="weather-location">--</div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div class="text-center">
+                                <div class="text-gray-500">Humidity</div>
+                                <div class="font-semibold" id="weather-humidity">--%</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-gray-500">Wind</div>
+                                <div class="font-semibold" id="weather-wind">-- m/s</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Weather Map -->
+                    <div id="weather-map" class="h-48 rounded-lg overflow-hidden mt-4 hidden"></div>
+                </div>
+
+                <!-- Manual Sensor Control -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-thermometer-half mr-3 text-orange-600"></i>
+                        Manual Sensor Readings
+                    </h2>
+                    
+                    <div class="space-y-3">
+                        <button id="read-soil-btn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition flex items-center justify-center space-x-2">
+                            <i class="fas fa-tint"></i>
+                            <span>Read Soil Moisture</span>
+                        </button>
+                        
+                        <button id="read-dht-btn" class="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition flex items-center justify-center space-x-2">
+                            <i class="fas fa-thermometer-half"></i>
+                            <span>Read Temp & Humidity</span>
+                        </button>
+                        
+                        <button id="read-all-btn" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition flex items-center justify-center space-x-2">
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Read All Sensors</span>
+                        </button>
+                    </div>
+                    
+                    <div id="sensor-status" class="mt-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-600 hidden">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Reading sensors...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Automatic Image Capture -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-camera mr-3 text-purple-600"></i>
+                        Automatic Capture
+                    </h2>
+                    
+                    <div class="space-y-3">
+                        <button id="auto-capture-btn" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition flex items-center justify-center space-x-2">
+                            <i class="fas fa-camera"></i>
+                            <span>Capture Image Now</span>
+                        </button>
+                        
+                        <div class="flex items-center justify-between text-sm text-gray-600">
+                            <span>Auto-capture interval:</span>
+                            <select id="capture-interval" class="border border-gray-300 rounded px-2 py-1">
+                                <option value="0">Disabled</option>
+                                <option value="300">5 minutes</option>
+                                <option value="600">10 minutes</option>
+                                <option value="900">15 minutes</option>
+                                <option value="1800">30 minutes</option>
+                                <option value="3600">1 hour</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="capture-status" class="mt-4 p-3 bg-gray-50 rounded-lg text-sm text-gray-600 hidden">
+                        <div class="flex items-center space-x-2">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <span>Capturing image...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Irrigation Control -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-tint mr-3 text-blue-600"></i>
+                        Irrigation Control
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <span class="text-gray-700">Water Pump</span>
+                            <div class="flex items-center space-x-2">
+                                <div id="pump-status" class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                <span id="pump-text" class="text-sm text-gray-600">OFF</span>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3">
+                            <button id="pump-on-btn" class="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2">
+                                <i class="fas fa-play"></i>
+                                <span>Start</span>
+                            </button>
+                            <button id="pump-off-btn" class="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition flex items-center justify-center space-x-2">
+                                <i class="fas fa-stop"></i>
+                                <span>Stop</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Chat -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-robot mr-3 text-purple-600"></i>
+                        AI Agronomist
+                    </h2>
+                    
+                    <div id="chat-container" class="chat-container bg-gray-50 rounded-lg p-4 mb-4">
+                        <div class="text-center text-gray-500 py-8">
+                            <i class="fas fa-comments text-3xl mb-2"></i>
+                            <p>Ask me about plant diseases, treatments, or agricultural advice!</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex space-x-2">
+                        <input type="text" id="chat-input" placeholder="Ask a question..." 
+                               class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                        <button id="chat-send" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-gray-400">&copy; 2025 AgriSight 2.0 @LPU</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/upload.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/relay.js"></script>
+    <script src="/static/js/weather.js"></script>
+    <script src="/static/js/sensors.js"></script>
+</body>
+</html>

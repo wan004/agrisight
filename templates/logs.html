@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics & Logs - AgriSight 2.0</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+        }
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90%;
+            margin-top: 2%;
+        }
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-leaf text-2xl"></i>
+                    <h1 class="text-2xl font-bold">AgriSight 2.0</h1>
+                </div>
+                <div class="flex space-x-6">
+                    <a href="/" class="flex items-center space-x-2 hover:text-gray-200 transition">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="/logs" class="flex items-center space-x-2 text-white border-b-2 border-white pb-1">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Analytics</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Analytics & Logs</h1>
+            <p class="text-gray-600">Monitor your crop health trends and system activity</p>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-camera text-blue-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Scans</p>
+                        <p id="total-scans" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-check text-green-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Healthy Plants</p>
+                        <p id="healthy-plants" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Issues Found</p>
+                        <p id="issues-found" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-md p-6 card-hover">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-tint text-purple-600 text-xl"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Avg Moisture</p>
+                        <p id="avg-moisture" class="text-2xl font-bold text-gray-900">0%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            
+            <!-- Sensor Data Chart -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-chart-line mr-3 text-blue-600"></i>
+                    Sensor Data Trends
+                </h2>
+                <div class="h-80">
+                    <canvas id="sensor-chart-large"></canvas>
+                </div>
+            </div>
+            
+            <!-- Disease Analysis Chart -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-6 flex items-center">
+                    <i class="fas fa-pie-chart mr-3 text-green-600"></i>
+                    Disease Analysis
+                </h2>
+                <div class="h-80">
+                    <canvas id="disease-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs Section -->
+        <div class="bg-white rounded-lg shadow-md">
+            <div class="border-b border-gray-200">
+                <nav class="flex space-x-8 px-6">
+                    <button class="tab-btn py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition" data-tab="gallery">
+                        <i class="fas fa-images mr-2"></i>Image Gallery
+                    </button>
+                    <button class="tab-btn py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition" data-tab="sensors">
+                        <i class="fas fa-database mr-2"></i>Sensor Logs
+                    </button>
+                    <button class="tab-btn py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition" data-tab="actions">
+                        <i class="fas fa-list mr-2"></i>System Actions
+                    </button>
+                    <button class="tab-btn py-4 px-1 border-b-2 border-purple-500 font-medium text-sm text-purple-600 transition" data-tab="gallery">
+                        <i class="fas fa-images mr-2"></i>Image Gallery
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="p-6">
+                
+                <!-- Gallery Tab -->
+                <div id="gallery-tab" class="tab-content">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800">Image Gallery</h3>
+                        <div class="flex space-x-2">
+                            <button id="refresh-gallery" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                                <i class="fas fa-sync-alt mr-2"></i>Refresh
+                            </button>
+                            <button id="delete-selected" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition disabled:opacity-50" disabled>
+                                <i class="fas fa-trash mr-2"></i>Delete Selected
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="gallery-grid" class="gallery-grid">
+                        <!-- Gallery items will be loaded here -->
+                    </div>
+                    
+                    <div id="gallery-empty" class="text-center py-12 hidden">
+                        <i class="fas fa-images text-6xl text-gray-300 mb-4"></i>
+                        <h3 class="text-lg font-medium text-gray-600 mb-2">No images found</h3>
+                        <p class="text-gray-500">Upload images from the dashboard to see them here</p>
+                    </div>
+                </div>
+
+                <!-- Sensors Tab -->
+                <div id="sensors-tab" class="tab-content hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800">Sensor Data Logs</h3>
+                        <button id="export-sensors" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                            <i class="fas fa-download mr-2"></i>Export CSV
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Moisture (%)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Temperature (°C)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Humidity (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sensors-table-body" class="bg-white divide-y divide-gray-200">
+                                <!-- Sensor data rows will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Actions Tab -->
+                <div id="actions-tab" class="tab-content hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800">System Actions</h3>
+                        <button id="clear-actions" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
+                            <i class="fas fa-trash mr-2"></i>Clear History
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action Type</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="actions-table-body" class="bg-white divide-y divide-gray-200">
+                                <!-- Action rows will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="image-modal" class="modal">
+        <div class="relative">
+            <img id="modal-image" class="modal-content">
+            <button id="close-modal" class="absolute top-4 right-4 text-white text-2xl hover:text-gray-300">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="absolute bottom-4 left-4 right-4 flex justify-between items-center">
+                <div id="modal-info" class="text-white">
+                    <h3 id="modal-disease" class="text-lg font-semibold"></h3>
+                    <p id="modal-confidence" class="text-sm"></p>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="download-image" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button id="delete-image" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-gray-400">&copy; 2024 AgriSight 2.0 - Intelligent IoT Crop Monitoring System</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="/static/js/logs.js"></script>
+</body>
+</html>
